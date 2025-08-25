@@ -39,7 +39,7 @@ class LogFactory:
         with self._lock:
             self._config.update(kwargs)
 
-    def get_logger(self, port: int, account: str, simulator_type: str, level: str = "INFO") -> logging.Logger:
+    def get_logger(self, port: int, account: str, simulator_type: str, level: str) -> logging.Logger:
         """获取或创建日志器实例
         
         Args:
@@ -81,7 +81,7 @@ class LogFactory:
 
             return logger
 
-    def get_title_logger(self, port: int, account: str, simulator_type: str, level: str = "INFO") -> logging.Logger:
+    def get_title_logger(self, port: int, account: str, simulator_type: str, level: str) -> logging.Logger:
         """获取或创建标题日志器实例
         
         Args:
@@ -174,7 +174,7 @@ class LogFactory:
         console_handler = logging.StreamHandler()
         console_formatter = ColoredFormatter(self._config["log_format"])
         console_handler.setFormatter(console_formatter)
-        console_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
+        console_handler.setLevel(getattr(logging, level.upper(), logging.DEBUG))
         return console_handler
 
     def _create_file_handler(self, simulator_type: str, port: int, account: str) -> logging.Handler:
@@ -244,7 +244,7 @@ class LogFactory:
 class LogWrapper:
     """日志包装类，提供友好的日志接口"""
 
-    def __init__(self, component_name: str, port: int, account: str, simulator_type: str, level: str = "INFO"):
+    def __init__(self, component_name: str, port: int, account: str, simulator_type: str, level: str):
         """初始化日志包装器
         
         Args:
@@ -376,7 +376,7 @@ class LogWrapper:
 log_factory = LogFactory()
 
 
-def get_logger(component_name: str, port: int, account: str, simulator_type: str, level: str = "INFO") -> LogWrapper:
+def get_logger(component_name: str, port: int, account: str, simulator_type: str, level: str = "DEBUG") -> LogWrapper:
     """全局函数，获取日志包装器实例
     
     Args:

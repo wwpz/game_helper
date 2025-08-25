@@ -25,7 +25,6 @@ class MuMuSimulator(SimulatorBase):
             account: 账号
         """
         self.port = port
-        self.xml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "res", "xml", "window_dump.xml")
         self.window_name = window_name
         self.window_class = window_class
         self.simulator_path = os.path.normpath(simulator_path)
@@ -41,8 +40,7 @@ class MuMuSimulator(SimulatorBase):
                 self.logger.info("MuMu模拟器启动成功")
                 if self.connect_simulator():
                     self.logger.info("成功连接到MuMu模拟器")
-                    if self.check_init():
-                        result = True
+                    return self.check_init()
                 else:
                     self.logger.error("连接到MuMu模拟器失败")
             else:
@@ -51,8 +49,7 @@ class MuMuSimulator(SimulatorBase):
                     self.logger.info("MuMu模拟器启动成功")
                     if self.connect_simulator():
                         self.logger.info("成功连接到MuMu模拟器")
-                        if self.check_init():
-                            result = True
+                        return self.check_init()
                     else:
                         self.logger.error("连接到MuMu模拟器失败")
                 else:
@@ -62,10 +59,10 @@ class MuMuSimulator(SimulatorBase):
         return result
 
     def check_init(self) -> bool:
-        self.logger.hr("启动成功模拟器后的检测流程----开始", level=3)
+        self.logger.hr("模拟器检测流程----开始", level=3)
         if self.image.check_resolution_ratio(1920, 1080):
             return self._close_simulator_Ad()
-        self.logger.hr("启动成功模拟器后的检测流程----结束", level=3)
+        self.logger.hr("模拟器检测流程----结束", level=3)
 
     def start_simulator(self) -> bool:
         """
@@ -172,42 +169,17 @@ class MuMuSimulator(SimulatorBase):
             return False
 
     def _close_simulator_Ad(self) -> bool:
+        """
+        关闭模拟器启动后的广告
+        通过端口号和账号来区分不同实例，避免文件名冲突
+        """
         self.logger.info("正在检测启动模拟器后的广告 -X-")
-        # 由于download_window_dump现在会生成带时间戳的唯一文件名，我们需要获取实际的文件名
-        # 先提取基础路径和目录
-        xml_dir = os.path.dirname(self.xml_path)
-        base_name = os.path.splitext(os.path.basename(self.xml_path))[0]
-        ext = os.path.splitext(self.xml_path)[1]
-        
-        # 调用下载方法，它会生成带时间戳的唯一文件
-        if self.adb.download_window_dump(self.xml_path):
-            # 查找最新生成的文件（基于时间戳）
-            latest_file = None
-            latest_time = 0
-            
-            # 列出目录中的所有匹配文件
-            if os.path.exists(xml_dir):
-                for file in os.listdir(xml_dir):
-                    if file.startswith(base_name) and file.endswith(ext):
-                        file_path = os.path.join(xml_dir, file)
-                        file_time = os.path.getmtime(file_path)
-                        if file_time > latest_time:
-                            latest_time = file_time
-                            latest_file = file_path
-            
-            # 使用最新生成的文件进行处理
-            if latest_file:
-                bounds = self.image.get_simulator_ui_bounds(latest_file, "com.mumu.launcher:id/close", "resource-id")
-                if bounds is not None:
-                    self.adb.click(bounds[0], bounds[1])
-                    self.logger.info("成功关闭启动模拟器后的广告")
-                    # 处理完后删除临时文件
-                    os.remove(latest_file)
-                else:
-                    self.logger.info("未找到启动模拟器后的广告")
-                    os.remove(latest_file)
-                return True
-            else:
-                self.logger.warning("未找到下载的布局文件")
+
+        bounds = self.image.get_simulator_ui_bounds("com.mumu.launcher:id/close", "resource-id")
+        if bounds is not None:
+            self.adb.click(bounds[0], bounds[1])
+            self.logger.info("成功关闭启动模拟器后的广告")
+            return True
         else:
-            self.logger.error("下载模拟器布局文件失败")
+            self.logger.info("未找到启动模拟器后的广告")
+            return True
