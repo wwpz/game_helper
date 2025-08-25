@@ -5,12 +5,12 @@ import threading
 from datetime import datetime
 from typing import Literal, Dict
 from logging.handlers import RotatingFileHandler
-from core.log.coloredformatter import ColoredFormatter
-from core.log.colorcodefilter import ColorCodeFilter
+from log.coloredformatter import ColoredFormatter
+from log.colorcodefilter import ColorCodeFilter
 
 
 class LogFactory:
-    """日志工厂类，负责创建和管理不同适配器和账号的日志实例"""
+    """日志工厂类，负责创建和管理不同组件和账号的日志实例"""
     _instance = None
     _lock = threading.RLock()
 
@@ -39,9 +39,16 @@ class LogFactory:
         with self._lock:
             self._config.update(kwargs)
 
-    def get_logger(self, adapter_name: str, account: str, level: str = "INFO") -> logging.Logger:
-        """获取或创建日志器实例"""
-        logger_key = f"{adapter_name}_{account}"
+    def get_logger(self, port: int, account: str, simulator_type: str, level: str = "INFO") -> logging.Logger:
+        """获取或创建日志器实例
+        
+        Args:
+            port: 端口号
+            account: 账号名称
+            simulator_type: 模拟器类型
+            level: 日志级别
+        """
+        logger_key = f"logger_{account}" if account else "logger_default"
 
         with self._lock:
             if logger_key not in self._loggers:
@@ -51,14 +58,14 @@ class LogFactory:
                 logger.setLevel(logging.DEBUG)
 
                 # 确保日志目录存在
-                self._ensure_log_directory_exists(adapter_name, account)
+                self._ensure_log_directory_exists(simulator_type, port, account)
 
                 # 添加控制台处理器
                 console_handler = self._create_console_handler(level)
                 logger.addHandler(console_handler)
 
                 # 添加文件处理器
-                file_handler = self._create_file_handler(adapter_name, account)
+                file_handler = self._create_file_handler(simulator_type, port, account)
                 logger.addHandler(file_handler)
 
                 # 存储日志器和处理器
@@ -74,9 +81,16 @@ class LogFactory:
 
             return logger
 
-    def get_title_logger(self, adapter_name: str, account: str, level: str = "INFO") -> logging.Logger:
-        """获取或创建标题日志器实例"""
-        title_logger_key = f"title_{adapter_name}_{account}"
+    def get_title_logger(self, port: int, account: str, simulator_type: str, level: str = "INFO") -> logging.Logger:
+        """获取或创建标题日志器实例
+        
+        Args:
+            port: 端口号
+            account: 账号名称
+            simulator_type: 模拟器类型
+            level: 日志级别
+        """
+        title_logger_key = f"title_logger_{account}" if account else "title_logger_default"
 
         with self._lock:
             if title_logger_key not in self._loggers:
@@ -86,7 +100,7 @@ class LogFactory:
                 title_logger.setLevel(logging.DEBUG)
 
                 # 确保日志目录存在
-                self._ensure_log_directory_exists(adapter_name, account)
+                self._ensure_log_directory_exists(simulator_type, port, account)
 
                 # 添加控制台处理器
                 console_handler = logging.StreamHandler()
@@ -96,7 +110,7 @@ class LogFactory:
                 title_logger.addHandler(console_handler)
 
                 # 添加文件处理器
-                log_file_path = self._get_log_file_path(adapter_name, account)
+                log_file_path = self._get_log_file_path(simulator_type, port, account)
                 file_handler = RotatingFileHandler(
                     log_file_path,
                     encoding="utf-8",
@@ -121,10 +135,10 @@ class LogFactory:
 
             return title_logger
 
-    def remove_logger(self, adapter_name: str, account: str) -> bool:
+    def remove_logger(self, account: str) -> bool:
         """移除日志器实例"""
-        logger_key = f"{adapter_name}_{account}"
-        title_logger_key = f"title_{adapter_name}_{account}"
+        logger_key = f"logger_{account}" if account else "logger_default"
+        title_logger_key = f"title_logger_{account}" if account else "title_logger_default"
 
         with self._lock:
             removed = False
@@ -163,9 +177,9 @@ class LogFactory:
         console_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
         return console_handler
 
-    def _create_file_handler(self, adapter_name: str, account: str) -> logging.Handler:
+    def _create_file_handler(self, simulator_type: str, port: int, account: str) -> logging.Handler:
         """创建文件日志处理器"""
-        log_file_path = self._get_log_file_path(adapter_name, account)
+        log_file_path = self._get_log_file_path(simulator_type, port, account)
         file_handler = RotatingFileHandler(
             log_file_path,
             encoding="utf-8",
@@ -177,16 +191,44 @@ class LogFactory:
         file_handler.setLevel(logging.DEBUG)
         return file_handler
 
-    def _get_log_file_path(self, adapter_name: str, account: str) -> str:
-        """获取日志文件路径"""
+    def _get_log_file_path(self, simulator_type: str, port: int, account: str) -> str:
+        """获取日志文件路径，格式为 logs/日期/模拟器类型/端口号和账号.log"""
         current_date = datetime.now().strftime("%Y-%m-%d")
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-        # 构建日志文件的绝对路径，确保使用正确的路径分隔符
-        return os.path.join(project_root, "logs", adapter_name, account, f"{current_date}.log")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 
-    def _ensure_log_directory_exists(self, adapter_name: str, account: str) -> None:
+        # 构建日志目录结构: logs/日期/模拟器类型/端口号和账号.log
+        log_base_dir = os.path.join(project_root, "logs")
+        date_dir = os.path.join(log_base_dir, current_date)
+
+        # 如果提供了模拟器类型，则按模拟器类型组织目录
+        if simulator_type:
+            simulator_dir = os.path.join(date_dir, simulator_type)
+
+            # 构建端口号和账号部分
+            if port and account:
+                file_name = f"{port}-{account}.log"
+            elif port:
+                file_name = f"{port}.log"
+            elif account:
+                file_name = f"{account}.log"
+            else:
+                file_name = "default.log"
+
+            # 确保目录存在
+            os.makedirs(simulator_dir, exist_ok=True)
+
+            # 返回日志文件路径
+            return os.path.join(simulator_dir, file_name)
+        else:
+            # 如果没有模拟器类型，使用默认结构
+            default_dir = os.path.join(date_dir, "system")
+            os.makedirs(default_dir, exist_ok=True)
+            return os.path.join(default_dir, "system.log")
+
+    def _ensure_log_directory_exists(self, simulator_type: str, port: int, account: str) -> None:
         """确保日志目录存在"""
-        log_dir = os.path.dirname(self._get_log_file_path(adapter_name, account))
+        log_file_path = self._get_log_file_path(simulator_type, port, account)
+        log_dir = os.path.dirname(log_file_path)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
 
@@ -202,32 +244,48 @@ class LogFactory:
 class LogWrapper:
     """日志包装类，提供友好的日志接口"""
 
-    def __init__(self, adapter_name: str, account: str, level: str = "INFO"):
-        self.adapter_name = adapter_name
+    def __init__(self, component_name: str, port: int, account: str, simulator_type: str, level: str = "INFO"):
+        """初始化日志包装器
+        
+        Args:
+            component_name: 组件名称（用于在日志中标识模块）
+            account: 账号名称
+            simulator_type: 模拟器类型
+            port: 端口号
+            level: 日志级别
+        """
+        self.component_name = component_name
         self.account = account
+        self.simulator_type = simulator_type
+        self.port = port
         self.log_factory = LogFactory()
-        self.logger = self.log_factory.get_logger(adapter_name, account, level)
-        self.title_logger = self.log_factory.get_title_logger(adapter_name, account, level)
+        self.logger = self.log_factory.get_logger(port, account, simulator_type, level)
+        self.title_logger = self.log_factory.get_title_logger(port, account, simulator_type, level)
 
     def info(self, format_str: str, *args):
         """记录信息日志"""
-        self.logger.info(format_str, *args)
+        message = f"[{self.component_name}] {format_str}"
+        self.logger.info(message, *args)
 
     def debug(self, format_str: str, *args):
         """记录调试日志"""
-        self.logger.debug(format_str, *args)
+        message = f"[{self.component_name}] {format_str}"
+        self.logger.debug(message, *args)
 
     def warning(self, format_str: str, *args):
         """记录警告日志"""
-        self.logger.warning(format_str, *args)
+        message = f"[{self.component_name}] {format_str}"
+        self.logger.warning(message, *args)
 
     def error(self, format_str: str, *args):
         """记录错误日志"""
-        self.logger.error(format_str, *args)
+        message = f"[{self.component_name}] {format_str}"
+        self.logger.error(message, *args)
 
     def critical(self, format_str: str, *args):
         """记录关键错误"""
-        self.logger.critical(format_str, *args)
+        message = f"[{self.component_name}] {format_str}"
+        self.logger.critical(message, *args)
 
     def hr(self, title: str, level: Literal[0, 1, 2, 3, 4] = 0, write: bool = True, style: str = 'default'):
         """格式化标题并打印或写入文件
@@ -242,7 +300,10 @@ class LogWrapper:
             return
 
         try:
-            title_lines = title.split('\n')
+            # 在标题前添加组件名称标识
+            titled_title = f"[{self.component_name}] {title}"
+
+            title_lines = titled_title.split('\n')
             max_title_length = max(self._custom_len(line) for line in title_lines)
             separator_length = max_title_length + 4
 
@@ -255,6 +316,9 @@ class LogWrapper:
             }
             style = style.lower() if style in styles else 'default'
             corner, hline, vline = styles[style].values()
+
+            # 初始化formatted_title变量
+            formatted_title = titled_title
 
             if level == 0:
                 # 带边框的标题框
@@ -273,19 +337,19 @@ class LogWrapper:
             elif level == 1:
                 # 粗标题（上下有分隔线）
                 line_sep = hline * (separator_length + 2)
-                padding = (separator_length - self._custom_len(title)) // 2
-                formatted_title = f"{line_sep}\n{vline} {' ' * padding}{title}{' ' * padding} {vline}\n{line_sep}"
+                padding = (separator_length - self._custom_len(titled_title)) // 2
+                formatted_title = f"{line_sep}\n{vline} {' ' * padding}{titled_title}{' ' * padding} {vline}\n{line_sep}"
             elif level == 2:
                 # 简单包围标题
-                padding = (separator_length - self._custom_len(title)) // 2
-                formatted_title = f"{corner}{hline * padding} {title} {hline * padding}{corner}"
+                padding = (separator_length - self._custom_len(titled_title)) // 2
+                formatted_title = f"{corner}{hline * padding} {titled_title} {hline * padding}{corner}"
             elif level == 3:
                 # 标题带前缀标记
                 marker = '▶' if level == 3 else '✓'
-                formatted_title = f"{marker} {title}"
+                formatted_title = f"{marker} [{self.component_name}] {title}"
             elif level == 4:
                 # 下划线标题
-                formatted_title = f"{title}\n{'-' * self._custom_len(title)}"
+                formatted_title = f"[{self.component_name}] {title}\n{'-' * self._custom_len(f'[{self.component_name}] {title}')}"
 
             if write:
                 self.title_logger.info(formatted_title)
@@ -303,7 +367,7 @@ class LogWrapper:
     def __del__(self):
         """析构函数，清理资源"""
         try:
-            self.log_factory.remove_logger(self.adapter_name, self.account)
+            self.log_factory.remove_logger(self.account)
         except:
             pass
 
@@ -312,6 +376,14 @@ class LogWrapper:
 log_factory = LogFactory()
 
 
-def get_logger(adapter_name: str, account: str, level: str = "INFO") -> LogWrapper:
-    """全局函数，获取日志包装器实例"""
-    return LogWrapper(adapter_name, account, level)
+def get_logger(component_name: str, port: int, account: str, simulator_type: str, level: str = "INFO") -> LogWrapper:
+    """全局函数，获取日志包装器实例
+    
+    Args:
+        component_name: 组件名称（用于在日志中标识模块）
+        account: 账号名称
+        level: 日志级别
+        simulator_type: 模拟器类型
+        port: 端口号
+    """
+    return LogWrapper(component_name, port, account, simulator_type, level)
