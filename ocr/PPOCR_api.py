@@ -13,14 +13,16 @@ from base64 import b64encode  # base64 编码
 
 
 class PPOCR_pipe:  # 调用OCR（管道模式）
-    def __init__(self, exePath: str, modelsPath: str = None, argument: dict = None):
+    def __init__(self, exePath: str, modelsPath: str = None, argument: dict = None, logger = None):
         """初始化识别器（管道模式）。\n
         `exePath`: 识别器`PaddleOCR_json.exe`的路径。\n
         `modelsPath`: 识别库`models`文件夹的路径。若为None则默认识别库与识别器在同一目录下。\n
         `argument`: 启动参数，字典`{"键":值}`。参数说明见 https://github.com/hiroi-sora/PaddleOCR-json
+        `log`: 日志记录器对象\n
         """
         # 私有成员变量
         self.__ENABLE_CLIPBOARD = False
+        self.logger = logger
 
         exePath = os.path.abspath(exePath)
         cwd = os.path.abspath(os.path.join(exePath, os.pardir))  # 获取exe父文件夹
@@ -103,7 +105,7 @@ class PPOCR_pipe:  # 调用OCR（管道模式）
             return {"code": 903, "data": f"读取识别器进程输出值失败。异常信息：[{e}]"}
         try:
             if show_log:
-                log.debug(f"本次orc识别结果为：{jsonLoads(getStr)}")
+                self.logger.debug(f"本次orc识别结果为：{jsonLoads(getStr)}")
             return jsonLoads(getStr)
         except Exception as e:
             return {
@@ -321,10 +323,11 @@ class PPOCR_socket(PPOCR_pipe):
 
 
 def GetOcrApi(
-        exePath: str, modelsPath: str = None, argument: dict = None, ipcMode: str = "pipe", log
+        exePath: str, modelsPath: str = None, argument: dict = None, ipcMode: str = "pipe", logger=None
 ):
     """获取识别器API对象。\n
     `exePath`: 识别器`PaddleOCR_json.exe`的路径。\n
+    `logger`: 日志记录器对象\n
     `modelsPath`: 识别库`models`文件夹的路径。若为None则默认识别库与识别器在同一目录下。\n
     `argument`: 启动参数，字典`{"键":值}`。参数说明见 https://github.com/hiroi-sora/PaddleOCR-json\n
     `ipcMode`: 进程通信模式，可选值为套接字模式`socket` 或 管道模式`pipe`。用法上完全一致。
@@ -332,7 +335,7 @@ def GetOcrApi(
     if ipcMode == "socket":
         return PPOCR_socket(exePath, modelsPath, argument)
     elif ipcMode == "pipe":
-        return PPOCR_pipe(exePath, modelsPath, argument)
+        return PPOCR_pipe(exePath, modelsPath, argument, logger)
     else:
         raise Exception(
             f'ipcMode可选值为 套接字模式"socket" 或 管道模式"pipe" ，不允许{ipcMode}。'

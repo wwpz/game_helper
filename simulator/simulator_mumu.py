@@ -5,9 +5,8 @@ import win32gui
 import subprocess
 from lxml import etree
 from log.log_factory import get_logger
-from simulator_models.adb.adb_controller import ADBController
+from simulator.simulator_manager import SimulatorManager
 from simulator_models.base.simulator_base import SimulatorBase
-from simulator_models.image.image_controller import ImageController
 
 
 class MuMuSimulator(SimulatorBase):
@@ -35,8 +34,7 @@ class MuMuSimulator(SimulatorBase):
         self.window_class = window_class
         self.game_package = "com.miHoYo.hkrpg"
         self.simulator_path = os.path.normpath(simulator_path)
-        self.adb = ADBController.get_instance(port, account, simulator_type)
-        self.image = ImageController.get_instance(port, account, simulator_type)
+        self.simulator = SimulatorManager.get_simulator_instance(port, account, simulator_type)
         self.logger = get_logger(self.__class__.__name__, port, account, simulator_type)
         self.xml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "res", "xml", "window_dump.xml")
 
@@ -70,7 +68,7 @@ class MuMuSimulator(SimulatorBase):
 
     def check_init(self) -> bool:
         self.logger.hr("模拟器检测流程----开始", level=3)
-        if self.image.check_resolution_ratio(1920, 1080):
+        if self.simulator.image.check_resolution_ratio(1920, 1080):
             return self._close_simulator_Ad()
         self.logger.hr("模拟器检测流程----结束", level=3)
 
@@ -116,7 +114,7 @@ class MuMuSimulator(SimulatorBase):
 
             # 断开ADB连接
             self.logger.info("正在断开ADB连接...")
-            disconnect_result = self.adb.disconnect(self.port)
+            disconnect_result = self.simulator.adb.disconnect(self.port)
             if disconnect_result:
                 self.logger.info("ADB断开连接成功")
             else:
@@ -156,7 +154,7 @@ class MuMuSimulator(SimulatorBase):
             bool: 连接成功返回True，否则返回False
         """
         self.logger.info("正在连接到MuMu模拟器...")
-        result = self.adb.connect(self.port)
+        result = self.simulator.adb.connect(self.port)
         return result
 
     def disconnect_simulator(self) -> bool:
@@ -168,7 +166,7 @@ class MuMuSimulator(SimulatorBase):
         """
         self.logger.info("正在断开与MuMu模拟器的连接...")
         try:
-            result = self.adb.disconnect(self.port)
+            result = self.simulator.adb.disconnect(self.port)
             if result:
                 self.logger.info("成功断开与MuMu模拟器的连接")
             else:
@@ -177,10 +175,11 @@ class MuMuSimulator(SimulatorBase):
         except Exception as e:
             self.logger.error(f"断开与MuMu模拟器连接时发生错误: {e}")
             return False
+
     def launcher_simulator_game(self):
         self.logger.hr("启动游戏----开始", level=3)
         # TODO 关闭游戏前需判断在能识别的首页时则不进行关闭应用,直接返回成功
-        if self.adb.close_simulator_game(self.game_package):
+        if self.simulator.adb.close_simulator_game(self.game_package):
             self._refresh_screen()
         # 首次尝试直接定位
         if self._try_launch():
@@ -191,10 +190,10 @@ class MuMuSimulator(SimulatorBase):
             # 动态判断滑动方向
             if self.count > 1:
                 # 优先向左滑动查找
-                self.adb.swipe_left() if attempt % 2 == 1 else self.adb.swipe_right()
+                self.simulator.adb.swipe_left() if attempt % 2 == 1 else self.simulator.adb.swipe_right()
             else:
                 # 从首页直接向右滑动
-                self.adb.swipe_right()
+                self.simulator.adb.swipe_right()
             self._refresh_screen()
             if self._try_launch():
                 return True
@@ -208,10 +207,10 @@ class MuMuSimulator(SimulatorBase):
 
     def _try_launch(self):
         self.logger.info("正在尝试定位并启动游戏...")
-        bounds = self.image.get_simulator_ui_bounds(self.icon)
+        bounds = self.simulator.image.get_simulator_ui_bounds(self.icon)
         if bounds is not None:
             self.logger.debug(f"已定位游戏图标坐标: {bounds}")
-            self.adb.click(bounds[0], bounds[1])
+            self.simulator.adb.click(bounds[0], bounds[1])
             return True
         else:
             self.logger.debug("当前屏幕未检测到游戏图标")
@@ -274,9 +273,9 @@ class MuMuSimulator(SimulatorBase):
         """
         self.logger.info("正在检测启动模拟器后的广告 -X-")
 
-        bounds = self.image.get_simulator_ui_bounds("com.mumu.launcher:id/close", "resource-id")
+        bounds = self.simulator.image.get_simulator_ui_bounds("com.mumu.launcher:id/close", "resource-id")
         if bounds is not None:
-            self.adb.click(bounds[0], bounds[1])
+            self.simulator.adb.click(bounds[0], bounds[1])
             self.logger.info("成功关闭启动模拟器后的广告")
             return True
         else:

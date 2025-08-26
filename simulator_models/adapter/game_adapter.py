@@ -10,8 +10,3 @@ class GameAdapter(ABC):
         :return: True or False
         """
         pass
-
-    @abstractmethod
-    def execute_task(self, task_name: str) -> bool:
-        # 执行指定任务
-        pass

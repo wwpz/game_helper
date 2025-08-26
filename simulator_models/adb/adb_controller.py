@@ -5,7 +5,6 @@ import threading
 import time
 import traceback
 import os
-from datetime import datetime
 
 from log.log_factory import get_logger
 
