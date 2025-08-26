@@ -13,13 +13,13 @@ if __name__ == "__main__":
             "simulator_path": "E:/MuMu Player 12/shell/MuMuPlayer.exe",
             "simulator_type": "mumu",
             "port": 16384,
-            "account": "test"
+            "account": "test",
+            "icon": "食物语"
         }
         adapter_kwargs = {
             "port": 16384,
             "account": "test",
-            "simulator_type": "mumu",
-            "icon": "食物语"
+            "simulator_type": "mumu"
         }
 
         # 使用 ** 解包传递参数
@@ -28,7 +28,6 @@ if __name__ == "__main__":
         if simulator.run():
             adapter = AdapterFactory.create_adapter("star_rail", **adapter_kwargs)
             logger.info("适配器实例创建成功: %s", type(adapter).__name__)
-            adapter.launcher_game()
 
     except Exception as e:
         print(f"创建模拟器时出错: {e}")

@@ -39,3 +39,11 @@ class SimulatorBase(ABC):
     def disconnect_simulator(self) -> bool:
         """断开连接"""
         pass
+
+    @abstractmethod
+    def launcher_simulator_game(self) -> bool:
+        """
+        从启动模拟器后 ---- 到点击启动游戏icon为 launcher_simulator_game 部分
+        :return: True or False
+        """
+        pass

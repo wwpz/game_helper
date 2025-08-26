@@ -196,6 +196,90 @@ class ADBController:
             self.logger.error(f"点击发生异常: {str(e)}")
         return False
 
+    def swipe(
+            self,
+            base_x1: int,
+            base_y1: int,
+            base_x2: int,
+            base_y2: int,
+            duration: int = 900,
+            max_offset: int = 5,
+            min_delay: float = 0.1,
+            max_delay: float = 0.5
+    ) -> bool:
+        """
+        增强版模拟滑动（带随机扰动和防护机制）
+
+        :param base_x1: 起点基准X坐标
+        :param base_y1: 起点基准Y坐标
+        :param base_x2: 终点基准X坐标
+        :param base_y2: 终点基准Y坐标
+        :param duration: 滑动持续时间（毫秒，默认900ms）
+        :param max_offset: 最大随机偏移量（默认5像素）
+        :param min_delay: 最小延迟秒数（默认0.1）
+        :param max_delay: 最大延迟秒数（默认0.5）
+        :return: 操作是否成功
+        """
+        try:
+            # ==================== 随机延迟 ====================
+            delay_seconds = random.uniform(min_delay, max_delay)
+            time.sleep(delay_seconds)
+
+            # ==================== 坐标扰动 ====================
+            offset_x1 = random.randint(-max_offset, max_offset)
+            offset_y1 = random.randint(-max_offset, max_offset)
+            offset_x2 = random.randint(-max_offset, max_offset)
+            offset_y2 = random.randint(-max_offset, max_offset)
+
+            actual_x1 = base_x1 + offset_x1
+            actual_y1 = base_y1 + offset_y1
+            actual_x2 = base_x2 + offset_x2
+            actual_y2 = base_y2 + offset_y2
+
+            # 记录坐标调整信息
+            coord_info = {
+                "original_start": (base_x1, base_y1),
+                "original_end": (base_x2, base_y2),
+                "offset_start": (offset_x1, offset_y1),
+                "offset_end": (offset_x2, offset_y2),
+                "final_start": (actual_x1, actual_y1),
+                "final_end": (actual_x2, actual_y2)
+            }
+
+            # ==================== 执行滑动 ====================
+            subprocess.run(
+                ["adb", "shell", "input", "swipe",
+                 str(actual_x1), str(actual_y1),
+                 str(actual_x2), str(actual_y2),
+                 str(duration)],
+                check=True,
+                timeout=5,
+                capture_output=True
+            )
+
+            # ==================== 日志记录 ====================
+            self.logger.debug(
+                "滑动操作成功 | "
+                f"延迟: {delay_seconds:.2f}s | "
+                f"基准坐标: ({base_x1},{base_y1})→({base_x2},{base_y2}) | "
+                f"最终坐标: ({actual_x1},{actual_y1})→({actual_x2},{actual_y2}) | "
+                f"持续时间: {duration}ms | "
+                f"坐标演变: {coord_info}"
+            )
+            return True
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("ADB命令执行超时，建议检查设备连接")
+        except subprocess.CalledProcessError as e:
+            self.logger.error(
+                f"ADB命令执行失败 [状态码:{e.returncode}]\n"
+                f"错误输出: {e.stderr.decode().strip()}"
+            )
+        except Exception as e:
+            self.logger.error(f"发生未预期的异常 {e}")
+            traceback.print_exc()
+        return False
+
     def close_simulator_game(self, package_name) -> bool:
         """
         通过ADB命令强制停止指定包名的应用程序
@@ -216,3 +300,13 @@ class ADBController:
         except subprocess.CalledProcessError as e:
             self.logger.error(f"关闭失败: {str(e)}")
             return False
+
+    def swipe_left(self):
+        """向左滑动（从右向左滑动手势）"""
+        self.swipe(480, 540, 1440, 540)
+        self.logger.debug("执行向左滑动")
+
+    def swipe_right(self):
+        """向右滑动（从左向右滑动手势）"""
+        self.swipe(1440, 540, 480, 540)
+        self.logger.debug("执行向右滑动")
