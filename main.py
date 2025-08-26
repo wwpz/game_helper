@@ -1,6 +1,6 @@
 from log.log_factory import get_logger
-from simulator.simulator_factory import SimulatorFactory
-from simulator_models.adapter.adapter_factory import AdapterFactory
+from adapter.factory.adapter_factory import AdapterFactory
+from simulator.factory.simulator_factory import SimulatorFactory
 
 if __name__ == "__main__":
     try:
