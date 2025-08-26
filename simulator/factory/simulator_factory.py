@@ -1,6 +1,7 @@
 from typing import Dict, Type
-from simulator_models.base.simulator_base import SimulatorBase
-from simulator.simulator_mumu import MuMuSimulator
+
+from simulator.base.simulator_base import SimulatorBase
+from simulator.implementations.mumu.simulator_mumu import MuMuSimulator
 
 
 class SimulatorFactory:

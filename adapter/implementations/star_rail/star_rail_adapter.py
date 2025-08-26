@@ -1,5 +1,5 @@
-from simulator.simulator_manager import SimulatorManager
-from simulator_models.adapter.game_adapter import GameAdapter
+from simulator.manager.simulator_manager import SimulatorManager
+from adapter.base.game_adapter import GameAdapter
 from log.log_factory import get_logger
 
 

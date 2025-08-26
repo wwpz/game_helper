@@ -1,4 +1,4 @@
-from simulator_models.adapter.game_adapter import GameAdapter
+from adapter.base.game_adapter import GameAdapter
 from log.log_factory import get_logger
 
 

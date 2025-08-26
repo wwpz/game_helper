@@ -1,7 +1,7 @@
 import threading
 from typing import Dict
 
-from simulator.simulator_instance import SimulatorInstance
+from simulator.manager.simulator_instance import SimulatorInstance
 
 
 class SimulatorManager:

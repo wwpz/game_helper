@@ -1,7 +1,7 @@
+from control.adb.adb_controller import ADBController
+from control.image.image_controller import ImageController
+from control.ocr.ocr_controller import GetOcrApi
 from log.log_factory import get_logger
-from ocr.PPOCR_api import GetOcrApi
-from simulator_models.adb.adb_controller import ADBController
-from simulator_models.image.image_controller import ImageController
 
 
 class SimulatorInstance:

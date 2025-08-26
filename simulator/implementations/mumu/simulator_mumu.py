@@ -5,8 +5,8 @@ import win32gui
 import subprocess
 from lxml import etree
 from log.log_factory import get_logger
-from simulator.simulator_manager import SimulatorManager
-from simulator_models.base.simulator_base import SimulatorBase
+from simulator.base.simulator_base import SimulatorBase
+from simulator.manager.simulator_manager import SimulatorManager
 
 
 class MuMuSimulator(SimulatorBase):

@@ -3,8 +3,8 @@ import threading
 import traceback
 import xml.etree.ElementTree as ET
 
+from control.adb.adb_controller import ADBController
 from log.log_factory import get_logger
-from simulator_models.adb.adb_controller import ADBController
 
 
 class ImageController:
