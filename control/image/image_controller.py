@@ -1,6 +1,5 @@
 import os
 import threading
-import traceback
 import xml.etree.ElementTree as ET
 
 from control.adb.adb_controller import ADBController
@@ -29,6 +28,7 @@ class ImageController:
             if key not in cls._instances:
                 cls._instances[key] = cls(port, account, simulator_type)
             return cls._instances[key]
+
     def get_simulator_ui_bounds(self, search_value, search_by='text'):
         """
         根据指定属性获取UI元素的bounds坐标
@@ -66,7 +66,8 @@ class ImageController:
                         bounds = node.get('bounds')
                         if bounds:
                             # 解析 bounds 字符串获取坐标
-                            left, top, right, bottom = map(int, bounds.replace("[", "").replace("]", ",").split(",")[:-1])
+                            left, top, right, bottom = map(int,
+                                                           bounds.replace("[", "").replace("]", ",").split(",")[:-1])
                             # 计算中心点坐标
                             center_x = (left + right) // 2
                             center_y = (top + bottom) // 2
@@ -83,8 +84,8 @@ class ImageController:
             self.logger.error("错误: 确保XML路径存在")
         except Exception as e:
             self.logger.error(f"运行根据指定属性获取UI元素的bounds坐标异常: {str(e)}")
-            traceback.format_exc()
             return None
+
     def check_resolution_ratio(self, target_width: int, target_height: int) -> bool:
         """检查分辨率"""
         self.logger.info("进入分辨率检测")

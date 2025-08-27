@@ -1,7 +1,8 @@
 from typing import Dict, Type
-from simulator_models.adapter.game_adapter import GameAdapter
-from simulator_models.adapter.star_rail.star_rail_adapter import StarRailAdapter
-from simulator_models.adapter.food.food_adapter import FoodAdapter
+
+from adapter.base.game_adapter import GameAdapter
+from adapter.implementations.food.food_adapter import FoodAdapter
+from adapter.implementations.star_rail.star_rail_adapter import StarRailAdapter
 
 
 class AdapterFactory:

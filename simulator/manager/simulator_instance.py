@@ -12,7 +12,7 @@ class SimulatorInstance:
         self.account = account
         self.adb = ADBController.get_instance(port, account, simulator_type)
         self.image = ImageController.get_instance(port, account, simulator_type)
-        self.ocr = GetOcrApi('core/ocr/PaddleOCR/PaddleOCR-json.exe', logger=get_logger("OCR-API", port, account, simulator_type))
+        self.ocr = GetOcrApi('control/ocr/PaddleOCR/PaddleOCR-json.exe', logger=get_logger("OCR-API", port, account, simulator_type))
 
     def cleanup(self):
         """清理资源"""

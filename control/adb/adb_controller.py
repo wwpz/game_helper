@@ -3,7 +3,6 @@ import re
 import subprocess
 import threading
 import time
-import traceback
 import os
 
 from log.log_factory import get_logger
@@ -33,22 +32,75 @@ class ADBController:
     def connect(self, port) -> bool:
         """连接到模拟器"""
         with self._connection_lock:
+            # 构建完整连接命令（便于异常时排查）
+            connect_cmd = f"{self.host}:{port}"
+            adb_cmd = ["adb", "connect", connect_cmd]
+
             try:
-                self.logger.info(f"正在尝试连接到模拟器 地址:{self.host} 端口: {port}...")
-                cmd = ["adb", "connect", f"{self.host}:{port}"]
-                # 修复编码问题，明确指定编码为utf-8
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, encoding='utf-8', errors='ignore')
-                # 添加空值检查
-                if result.stdout is not None:
-                    stdout_lower = result.stdout.lower()
-                    if "connected" in stdout_lower or "already" in stdout_lower:
-                        return True
-                    else:
-                        self.logger.error(f"无法连接到模拟器: {stdout_lower}")
+                self.logger.info(f"正在尝试连接到模拟器: {connect_cmd}")
+                self.logger.debug(f"执行ADB命令: {' '.join(adb_cmd)}")  # 打印完整命令
+
+                # 执行ADB命令
+                result = subprocess.run(
+                    adb_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    encoding='utf-8',
+                    errors='ignore'
+                )
+
+                # 处理命令输出（区分不同情况）
+                stdout = result.stdout.strip() if result.stdout else "无输出"
+
+                # 判断连接结果
+                if "connected" in stdout.lower() or "already" in stdout.lower():
+                    self.logger.info(f"成功连接到模拟器: {connect_cmd}")
+                    return True
+                else:
+                    self.logger.error(
+                        f"连接模拟器失败: 命令返回非预期结果\n"
+                        f"返回码: {result.returncode}\n"
+                        f"输出信息: {stdout}"
+                    )
+                    return False
+
+            except FileNotFoundError:
+                # 专门处理ADB文件找不到的错误（最常见问题）
+                self.logger.error(
+                    f"连接模拟器失败: 未找到ADB工具\n"
+                    f"请检查ADB是否已安装并配置到环境变量，或在代码中指定正确路径\n"
+                    f"执行的命令: {' '.join(adb_cmd)}"
+                )
                 return False
+
+            except subprocess.TimeoutExpired:
+                # 超时错误单独处理
+                self.logger.error(
+                    f"连接模拟器超时: 命令执行超过{10}秒未响应\n"
+                    f"目标地址: {connect_cmd}\n"
+                    f"执行的命令: {' '.join(adb_cmd)}"
+                )
+                return False
+
+            except PermissionError:
+                # 权限错误（如无执行ADB的权限）
+                self.logger.error(
+                    f"连接模拟器失败: 没有执行ADB命令的权限\n"
+                    f"请检查ADB文件权限或尝试以管理员身份运行\n"
+                    f"执行的命令: {' '.join(adb_cmd)}"
+                )
+                return False
+
             except Exception as e:
-                self.logger.error(f"连接模拟器时发生异常: {e}")
-                traceback.print_exc()
+                # 其他未知异常
+                self.logger.error(
+                    f"连接模拟器时发生未知异常\n"
+                    f"目标地址: {connect_cmd}\n"
+                    f"执行的命令: {' '.join(adb_cmd)}\n"
+                    f"异常类型: {type(e).__name__}\n"
+                    f"异常信息: {str(e)}"
+                )
                 return False
 
     def disconnect(self, port: int) -> bool:
@@ -58,7 +110,8 @@ class ADBController:
             cmd = ["adb", "disconnect", f"{self.host}:{port}"]
             subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             return True
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"断开模拟器失败: {str(e)}")
             return False
 
     def get_current_display_resolution(self) -> tuple[int, int] | None:
@@ -276,7 +329,6 @@ class ADBController:
             )
         except Exception as e:
             self.logger.error(f"发生未预期的异常 {e}")
-            traceback.print_exc()
         return False
 
     def close_simulator_game(self, package_name) -> bool:

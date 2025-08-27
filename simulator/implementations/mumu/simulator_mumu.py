@@ -37,6 +37,7 @@ class MuMuSimulator(SimulatorBase):
         self.simulator = SimulatorManager.get_simulator_instance(port, account, simulator_type)
         self.logger = get_logger(self.__class__.__name__, port, account, simulator_type)
         self.xml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "res", "xml", "window_dump.xml")
+        self._is_screen_initialized = False
 
     def run(self) -> bool:
         result = False
@@ -180,30 +181,49 @@ class MuMuSimulator(SimulatorBase):
         self.logger.hr("启动游戏----开始", level=3)
         # TODO 关闭游戏前需判断在能识别的首页时则不进行关闭应用,直接返回成功
         if self.simulator.adb.close_simulator_game(self.game_package):
-            self._refresh_screen()
-        # 首次尝试直接定位
-        if self._try_launch():
-            return True
-        # 计算滑动策略
-        self.logger.debug(f"开始循环滑动查找，最大尝试次数: {self.page}")
-        for attempt in range(1, self.page + 1):
-            # 动态判断滑动方向
-            if self.count > 1:
-                # 优先向左滑动查找
-                self.simulator.adb.swipe_left() if attempt % 2 == 1 else self.simulator.adb.swipe_right()
-            else:
-                # 从首页直接向右滑动
-                self.simulator.adb.swipe_right()
-            self._refresh_screen()
-            if self._try_launch():
-                return True
+            if self._refresh_screen():
+                # 首次尝试直接定位
+                if self._try_launch():
+                    return True
+                else:
+                    if self.page <= 1:
+                        self.logger.debug("只有一页，无需滑动查找")
+                        return False
+                    # 计算滑动策略
+                    self.logger.debug(f"开始循环滑动查找，最大尝试次数: {self.page}")
+                    for attempt in range(1, self.page + 1):
+                        # 动态判断滑动方向
+                        if self.count > 1:
+                            # 优先向左滑动查找
+                            self.simulator.adb.swipe_left() if attempt % 2 == 1 else self.simulator.adb.swipe_right()
+                        else:
+                            # 从首页直接向右滑动
+                            self.simulator.adb.swipe_right()
+                        self._refresh_screen()
+                        if self._try_launch():
+                            return True
         self.logger.hr("启动游戏----结束", level=3)
         return False
 
     def _refresh_screen(self):
-        self.logger.info("刷新当前模拟器屏幕数据...")
+        if self._is_screen_initialized:
+            self.logger.info("刷新当前模拟器屏幕数据...")
+        else:
+            self.logger.info("初始化模拟器屏幕相关页数...")
+            self._is_screen_initialized = True
+            
         if self._get_simulator_screen_info():
-            self.logger.info("屏幕数据已刷新")
+            if self._is_screen_initialized:
+                self.logger.info("屏幕数据已刷新")
+            else:
+                self.logger.info("屏幕数据初始化完成")
+            return True
+        else:
+            if self._is_screen_initialized:
+                self.logger.error("刷新当前模拟器屏幕数据失败")
+            else:
+                self.logger.error("初始化当前模拟器屏幕数据失败")
+            return False
 
     def _try_launch(self):
         self.logger.info("正在尝试定位并启动游戏...")
@@ -213,10 +233,10 @@ class MuMuSimulator(SimulatorBase):
             self.simulator.adb.click(bounds[0], bounds[1])
             return True
         else:
-            self.logger.debug("当前屏幕未检测到游戏图标")
+            self.logger.error("当前屏幕未检测到游戏图标")
             return False
 
-    def _get_simulator_screen_info(self):
+    def _get_simulator_screen_info(self) -> bool:
         """
         获取模拟器当前屏幕信息（当前屏号和总屏数）
 
@@ -225,43 +245,61 @@ class MuMuSimulator(SimulatorBase):
             None: 解析失败时返回None
         """
         try:
-            self.logger.info("正在解析当前模拟器屏幕数据...")
-            tree = etree.parse(self.xml_path)
-            root = tree.getroot()
+            # 使用端口号和账号构建唯一文件名，避免多实例冲突
+            xml_dir = os.path.dirname(self.xml_path)
+            base_name = os.path.splitext(os.path.basename(self.xml_path))[0]
+            ext = os.path.splitext(self.xml_path)[1]
 
-            # 定位页面指示器节点
-            target_nodes = root.xpath('//node[@resource-id="com.mumu.launcher:id/page_indicator"]')
-            if not target_nodes:
-                self.logger.error("未找到页面指示器节点")
-                return False
+            # 构建基于端口和账号的唯一文件名
+            unique_filename = f"{base_name}_{self.port}_{self.simulator.account}{ext}"
+            unique_xml_path = os.path.join(xml_dir, unique_filename)
 
-            content_desc = target_nodes[0].get("content-desc", "")
-            if not content_desc:
-                self.logger.error("content-desc 属性为空")
-                return False
+            # 确保目标目录存在
+            if not os.path.exists(xml_dir):
+                os.makedirs(xml_dir)
 
-            # 提取关键信息
-            parts = content_desc.split("：")
-            if len(parts) < 2:
-                self.logger.error("content-desc 格式不符合预期")
-                return False
-
-            screen_info = parts[1].split(",")[0].strip()  # "第1屏，共2屏"
-
-            # 正则提取当前屏和总屏数
-            match = re.search(r'第(\d+)屏，共(\d+)屏', screen_info)
-            if not match:
-                self.logger.error("无法解析屏幕信息")
+            # 下载XML文件
+            if not self.simulator.adb.download_window_dump(unique_xml_path):
+                self.logger.error("下载模拟器布局文件失败")
                 return False
             else:
-                # 赋值给实例变量
-                self.count = int(match.group(1))  # 当前所在屏
-                self.page = int(match.group(2))  # 总屏数
-                # 保持原有返回格式
-                self.logger.info("解析成功...")
-                formatted_result = f"当前所在屏幕：{screen_info}"
-                self.logger.info(formatted_result)
-                return True
+                self.logger.info("正在解析当前模拟器屏幕数据...")
+                tree = etree.parse(unique_xml_path)
+                root = tree.getroot()
+
+                # 定位页面指示器节点
+                target_nodes = root.xpath('//node[@resource-id="com.mumu.launcher:id/page_indicator"]')
+                if not target_nodes:
+                    self.logger.error("未找到页面指示器节点")
+                    return False
+
+                content_desc = target_nodes[0].get("content-desc", "")
+                if not content_desc:
+                    self.logger.error("content-desc 属性为空")
+                    return False
+
+                # 提取关键信息
+                parts = content_desc.split("：")
+                if len(parts) < 2:
+                    self.logger.error("content-desc 格式不符合预期")
+                    return False
+
+                screen_info = parts[1].split(",")[0].strip()  # "第1屏，共2屏"
+
+                # 正则提取当前屏和总屏数
+                match = re.search(r'第(\d+)屏，共(\d+)屏', screen_info)
+                if not match:
+                    self.logger.error("无法解析屏幕信息")
+                    return False
+                else:
+                    # 赋值给实例变量
+                    self.count = int(match.group(1))  # 当前所在屏
+                    self.page = int(match.group(2))  # 总屏数
+                    # 保持原有返回格式
+                    self.logger.info("解析成功...")
+                    formatted_result = f"当前所在屏幕：{screen_info}"
+                    self.logger.info(formatted_result)
+                    return True
         except Exception as e:
             self.logger.debug(f"解析异常: {str(e)}")
             return False
